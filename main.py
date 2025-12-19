@@ -1,7 +1,6 @@
 import hashlib
 import os
 import time
-import re
 from fastapi import FastAPI, HTTPException, Form
 from config import load_secret
 
@@ -9,24 +8,6 @@ SMS_OUTGOING_DIR = "/var/spool/sms/outgoing"
 SECRET_KEY = load_secret()
 
 app = FastAPI()
-
-VN_PHONE_REGEX = re.compile(r"^(0|\+84)(3|5|7|8|9)[0-9]{8}$")
-
-
-def normalize_vn_phone(phone: str) -> str:
-    phone = phone.strip()
-    if phone.startswith("+84"):
-        phone = "0" + phone[3:]
-    return phone
-
-
-def validate_vn_phone(phone: str) -> str:
-    if not VN_PHONE_REGEX.match(phone):
-        raise HTTPException(
-            status_code=400,
-            detail="INVALID_VN_PHONE_FORMAT"
-        )
-    return normalize_vn_phone(phone)
 
 
 def verify_md5(phone: str, message: str, client_hash: str) -> bool:
@@ -57,8 +38,6 @@ def send_sms(
     noidungtinnhan: str = Form(...),
     hash: str = Form(...)
 ):
-    sdt = validate_vn_phone(sdt)
-
     if not verify_md5(sdt, noidungtinnhan, hash):
         raise HTTPException(status_code=403, detail="INVALID_HASH")
 
