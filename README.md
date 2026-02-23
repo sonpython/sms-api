@@ -10,7 +10,6 @@ The service is exposed securely to the internet using **Cloudflare Tunnel**, wit
 
 - Send SMS via HTTP API
 - MD5-based request signature validation
-- Vietnamese phone number format validation
 - File-based SMS queue compatible with `smstools`
 - Production-ready deployment (systemd + Cloudflare Tunnel)
 - No inbound firewall ports required
@@ -32,27 +31,9 @@ Content-Type: application/x-www-form-urlencoded
 
 | Name | Required | Description |
 |---|---|---|
-| `sdt` | Yes | Vietnamese phone number |
+| `sdt` | Yes | Phone number |
 | `noidungtinnhan` | Yes | SMS message content |
 | `hash` | Yes | MD5 signature |
-
----
-
-## Phone Number Format
-
-Accepted formats:
-- `0xxxxxxxxx`
-- `+84xxxxxxxxx`
-
-Valid prefixes: `03, 05, 07, 08, 09`
-
-Example:
-```
-
-0901234567
-+84901234567
-
-```
 
 ---
 
@@ -111,10 +92,9 @@ curl -X POST https://sms.sonpython.com/send-sms \
 
 ## Error Responses
 
-| HTTP Code | Error                   |
-| --------- | ----------------------- |
-| 400       | INVALID_VN_PHONE_FORMAT |
-| 403       | INVALID_HASH            |
+| HTTP Code | Error          |
+| --------- | -------------- |
+| 403       | INVALID_HASH   |
 
 ---
 
