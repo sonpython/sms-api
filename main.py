@@ -6,9 +6,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Form
 from fastapi.staticfiles import StaticFiles
 
-from config import load_secret
+from config import load_secret, load_sms_base_dir
 
-SMS_OUTGOING_DIR = "/var/spool/sms/outgoing"
+SMS_OUTGOING_DIR = os.path.join(load_sms_base_dir(), "outgoing")
 SECRET_KEY = load_secret()
 
 app = FastAPI()

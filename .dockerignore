@@ -1,0 +1,10 @@
+.git
+.claude
+.opencode
+node_modules
+frontend/node_modules
+plans
+tests
+__pycache__
+*.pyc
+passkey.conf

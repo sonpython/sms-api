@@ -1,0 +1,7 @@
+services:
+  sms-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sms-data:/var/spool/sms

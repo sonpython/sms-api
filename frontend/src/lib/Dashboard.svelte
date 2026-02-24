@@ -1,11 +1,11 @@
 <script>
-  import { fetchSmsFiles, fetchSmsFile, createWebSocket, clearToken } from './api.js'
+  import { fetchSmsFiles, fetchSmsFile, sendTestSms, createWebSocket, clearToken } from './api.js'
 
   let { onLogout } = $props()
 
-  const FOLDERS = ['checked', 'failed', 'incoming', 'outgoing', 'sent']
+  const FOLDERS = ['incoming', 'sent', 'failed', 'outgoing', 'checked']
 
-  let activeFolder = $state('sent')
+  let activeFolder = $state('incoming')
   let files = $state([])
   let total = $state(0)
   let page = $state(1)
@@ -123,6 +123,30 @@
     onLogout()
   }
 
+  // Send test SMS
+  let showSendForm = $state(false)
+  let sendPhone = $state('')
+  let sendMessage = $state('')
+  let sending = $state(false)
+  let sendResult = $state(null)
+
+  async function handleSend() {
+    if (!sendPhone.trim() || !sendMessage.trim()) return
+    sending = true
+    sendResult = null
+    try {
+      const data = await sendTestSms(sendPhone.trim(), sendMessage.trim())
+      sendResult = { ok: true, file: data.file }
+      sendPhone = ''
+      sendMessage = ''
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') { onLogout(); return }
+      sendResult = { ok: false, error: err.message }
+    } finally {
+      sending = false
+    }
+  }
+
   function formatDate(ts) {
     return new Date(ts * 1000).toLocaleString()
   }
@@ -138,9 +162,30 @@
     <h1>SMS Admin</h1>
     <div class="header-right">
       <span class="ws-status" class:connected={wsConnected}>{wsConnected ? 'Live' : 'Offline'}</span>
+      <button class="btn-send" onclick={() => { showSendForm = !showSendForm; sendResult = null }}>Send SMS</button>
       <button class="btn-logout" onclick={handleLogout}>Logout</button>
     </div>
   </header>
+
+  <!-- Send SMS form -->
+  {#if showSendForm}
+    <div class="send-form">
+      <div class="send-fields">
+        <input type="tel" bind:value={sendPhone} placeholder="Phone number" class="send-input" />
+        <textarea bind:value={sendMessage} placeholder="Message..." class="send-textarea" rows="3"></textarea>
+      </div>
+      <div class="send-actions">
+        <button class="btn-do-send" onclick={handleSend} disabled={sending || !sendPhone.trim() || !sendMessage.trim()}>
+          {sending ? 'Sending...' : 'Send'}
+        </button>
+        {#if sendResult}
+          <span class="send-result" class:ok={sendResult.ok}>
+            {sendResult.ok ? `Sent → ${sendResult.file}` : sendResult.error}
+          </span>
+        {/if}
+      </div>
+    </div>
+  {/if}
 
   <!-- Folder tabs -->
   <nav class="tabs">
@@ -253,7 +298,67 @@
     cursor: pointer;
     font-size: 0.875rem;
   }
+  .btn-send {
+    padding: 0.4rem 0.75rem;
+    background: #1d4ed8;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .btn-send:hover { background: #2563eb; }
   .btn-logout:hover { background: #475569; }
+
+  /* Send form */
+  .send-form {
+    padding: 1rem 1.5rem;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  .send-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 500px;
+  }
+  .send-input, .send-textarea {
+    padding: 0.5rem 0.75rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.875rem;
+    font-family: inherit;
+  }
+  .send-input:focus, .send-textarea:focus { outline: none; border-color: #3b82f6; }
+  .send-textarea { resize: vertical; }
+  .send-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+  .btn-do-send {
+    padding: 0.5rem 1.25rem;
+    background: #1d4ed8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .btn-do-send:hover:not(:disabled) { background: #2563eb; }
+  .btn-do-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-result {
+    font-size: 0.75rem;
+    color: #ef4444;
+  }
+  .send-result.ok { color: #22c55e; }
 
   /* Tabs */
   .tabs {

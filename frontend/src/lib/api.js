@@ -64,6 +64,26 @@ export async function fetchSmsFile(folder, filename) {
   return res.json()
 }
 
+export async function sendTestSms(phone, message) {
+  const form = new URLSearchParams()
+  form.set('phone', phone)
+  form.set('message', message)
+
+  const res = await fetch('/admin/api/send-test-sms', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form,
+  })
+
+  if (res.status === 401) {
+    clearToken()
+    throw new Error('UNAUTHORIZED')
+  }
+  if (!res.ok) throw new Error('Failed to send SMS')
+
+  return res.json()
+}
+
 export function createWebSocket() {
   const token = getToken()
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'

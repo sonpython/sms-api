@@ -7,16 +7,16 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, De
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 
-from config import load_secret, load_admin_key
+from config import load_secret, load_admin_key, load_sms_base_dir
 
 # --- Constants ---
 
 ADMIN_KEY = load_admin_key()
-JWT_SECRET = load_secret()  # use SECRET_KEY for JWT signing (separate from ADMIN_KEY)
+JWT_SECRET = load_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
-SMS_BASE_DIR = "/var/spool/sms"
+SMS_BASE_DIR = load_sms_base_dir()
 ALLOWED_FOLDERS = ["checked", "failed", "incoming", "outgoing", "sent"]
 
 router = APIRouter(prefix="/admin")
@@ -144,6 +144,28 @@ def read_sms_file(
         raise HTTPException(status_code=404, detail="FILE_NOT_FOUND")
 
     return _parse_sms_file(filepath)
+
+
+# --- Send test SMS ---
+
+@router.post("/api/send-test-sms")
+def send_test_sms(
+    phone: str = Form(...),
+    message: str = Form(...),
+    _admin: str = Depends(verify_token),
+):
+    """Send a test SMS by writing to the outgoing spool directory."""
+    import time
+    ts = int(time.time())
+    filename = f"sms_{ts}_{phone}.sms"
+    outgoing = Path(SMS_BASE_DIR) / "outgoing"
+    outgoing.mkdir(parents=True, exist_ok=True)
+    filepath = outgoing / filename
+
+    content = f"To: {phone}\n\n{message}\n"
+    filepath.write_text(content, encoding="utf-8")
+
+    return {"status": "OK", "file": filename}
 
 
 # --- WebSocket for realtime updates ---

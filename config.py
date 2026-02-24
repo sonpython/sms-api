@@ -27,3 +27,8 @@ def load_admin_key():
     if "ADMIN_KEY" not in config:
         raise RuntimeError("ADMIN_KEY not found in passkey.conf")
     return config["ADMIN_KEY"]
+
+
+def load_sms_base_dir():
+    config = _load_config()
+    return config.get("SMS_BASE_DIR", "/var/spool/sms")
