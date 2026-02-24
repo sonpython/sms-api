@@ -13,9 +13,10 @@ cd "$PROJECT_DIR"
 echo ">> git pull"
 git pull origin main
 
-# Install Python dependencies
-echo ">> pip install"
-pip3 install -r requirements.txt --quiet
+# Install Python dependencies via uv
+echo ">> uv install"
+uv venv .venv --python 3.13 2>/dev/null || true
+uv pip install -r requirements.txt --quiet
 
 # Build frontend
 echo ">> bun build"
@@ -27,5 +28,6 @@ cd ..
 # Restart API service (cloudflared stays running)
 echo ">> restart $SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
+sudo systemctl restart cloudflared 2>/dev/null || true
 
 echo "=== Deploy complete ==="
