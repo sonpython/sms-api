@@ -17,7 +17,11 @@ def _create_sms_file(folder, filename, content="To: 0901234567\n\nHello"):
 def test_list_empty_folder(client, auth_headers):
     resp = client.get("/admin/api/sms/checked", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.json() == {"files": [], "total": 0}
+    data = resp.json()
+    assert data["files"] == []
+    assert data["total"] == 0
+    assert data["page"] == 1
+    assert data["per_page"] == 50
 
 
 def test_list_files_in_folder(client, auth_headers):

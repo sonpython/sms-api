@@ -91,14 +91,16 @@ def list_sms_files(
     sort_by: str = "modified",
     sort_order: str = "desc",
     search: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 50,
     _admin: str = Depends(verify_token),
 ):
-    """List SMS files in a folder with optional search and sort."""
+    """List SMS files in a folder with optional search, sort, and pagination."""
     _validate_folder(folder)
     folder_path = Path(SMS_BASE_DIR) / folder
 
     if not folder_path.exists():
-        return {"files": [], "total": 0}
+        return {"files": [], "total": 0, "page": 1, "per_page": per_page, "pages": 0}
 
     files = []
     for f in folder_path.iterdir():
@@ -114,7 +116,15 @@ def list_sms_files(
     else:
         files.sort(key=lambda x: x["modified"], reverse=reverse)
 
-    return {"files": files, "total": len(files)}
+    # Paginate
+    total = len(files)
+    per_page = max(1, min(per_page, 200))
+    page = max(1, page)
+    pages = (total + per_page - 1) // per_page if total else 0
+    start = (page - 1) * per_page
+    files = files[start:start + per_page]
+
+    return {"files": files, "total": total, "page": page, "per_page": per_page, "pages": pages}
 
 
 @router.get("/api/sms/{folder}/{filename}")

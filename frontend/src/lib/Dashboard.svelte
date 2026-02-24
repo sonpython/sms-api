@@ -8,6 +8,9 @@
   let activeFolder = $state('sent')
   let files = $state([])
   let total = $state(0)
+  let page = $state(1)
+  let pages = $state(0)
+  const perPage = 50
   let search = $state('')
   let sortBy = $state('modified')
   let sortOrder = $state('desc')
@@ -19,16 +22,17 @@
   let ws = null
   let searchTimeout = null
 
-  // Load files when folder, sort, or search changes
+  // Load files when folder, sort, search, or page changes
   $effect(() => {
     const _folder = activeFolder
     const _sortBy = sortBy
     const _sortOrder = sortOrder
     const _search = search
+    const _page = page
 
     clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => {
-      loadFiles(_folder, _sortBy, _sortOrder, _search)
+      loadFiles(_folder, _sortBy, _sortOrder, _search, _page)
     }, _search ? 300 : 0)
 
     return () => clearTimeout(searchTimeout)
@@ -41,12 +45,13 @@
     return () => { if (ws) ws.close() }
   })
 
-  async function loadFiles(folder, sb, so, q) {
+  async function loadFiles(folder, sb, so, q, p) {
     loading = true
     try {
-      const data = await fetchSmsFiles(folder, { sortBy: sb, sortOrder: so, search: q })
+      const data = await fetchSmsFiles(folder, { sortBy: sb, sortOrder: so, search: q, page: p, perPage })
       files = data.files
       total = data.total
+      pages = data.pages
     } catch (err) {
       if (err.message === 'UNAUTHORIZED') onLogout()
     } finally {
@@ -143,7 +148,7 @@
       <button
         class="tab"
         class:active={activeFolder === folder}
-        onclick={() => { activeFolder = folder; selectedFile = null; fileContent = null }}
+        onclick={() => { activeFolder = folder; page = 1; selectedFile = null; fileContent = null }}
       >
         {folder}
       </button>
@@ -187,6 +192,15 @@
       {/each}
     {/if}
   </div>
+
+  <!-- Pagination -->
+  {#if pages > 1}
+    <div class="pagination">
+      <button disabled={page <= 1} onclick={() => page--}>Prev</button>
+      <span>{page} / {pages}</span>
+      <button disabled={page >= pages} onclick={() => page++}>Next</button>
+    </div>
+  {/if}
 
   <!-- File content modal -->
   {#if selectedFile && fileContent}
@@ -335,6 +349,28 @@
     text-align: center;
     color: #64748b;
   }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+  .pagination button {
+    padding: 0.4rem 0.75rem;
+    background: #334155;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .pagination button:hover:not(:disabled) { background: #475569; }
+  .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pagination span { color: #94a3b8; }
 
   /* Modal */
   .modal-backdrop {

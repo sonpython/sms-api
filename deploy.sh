@@ -15,7 +15,7 @@ git pull origin main
 
 # Install Python dependencies
 echo ">> pip install"
-pip install -r requirements.txt --quiet
+pip3 install -r requirements.txt --quiet
 
 # Build frontend
 echo ">> bun build"

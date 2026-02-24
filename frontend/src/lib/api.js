@@ -33,8 +33,8 @@ export async function login(adminKey) {
   return data.token
 }
 
-export async function fetchSmsFiles(folder, { sortBy = 'modified', sortOrder = 'desc', search = '' } = {}) {
-  const params = new URLSearchParams({ sort_by: sortBy, sort_order: sortOrder })
+export async function fetchSmsFiles(folder, { sortBy = 'modified', sortOrder = 'desc', search = '', page = 1, perPage = 50 } = {}) {
+  const params = new URLSearchParams({ sort_by: sortBy, sort_order: sortOrder, page, per_page: perPage })
   if (search) params.set('search', search)
 
   const res = await fetch(`/admin/api/sms/${folder}?${params}`, {
