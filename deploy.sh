@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
 PROJECT_DIR="/opt/sms-api"
 SERVICE_NAME="sms-api"
 
