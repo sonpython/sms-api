@@ -9,7 +9,10 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Deploy
+      - name: Pull latest code
         run: |
           cd /opt/sms-api
-          bash deploy.sh
+          git pull origin main
+
+      - name: Run deploy script
+        run: bash /opt/sms-api/deploy.sh

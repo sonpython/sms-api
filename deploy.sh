@@ -9,10 +9,6 @@ echo "Time: $(date)"
 
 cd "$PROJECT_DIR"
 
-# Pull latest code
-echo ">> git pull"
-git pull origin main
-
 # Install Python dependencies via uv
 echo ">> uv install"
 uv venv .venv --python 3.13 2>/dev/null || true
