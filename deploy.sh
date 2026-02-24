@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
+# Resolve home dir for tool paths (handles runner env where $HOME may differ)
+REAL_HOME=$(eval echo ~$(whoami))
+export PATH="$REAL_HOME/.local/bin:$REAL_HOME/.cargo/bin:$REAL_HOME/.bun/bin:/usr/local/bin:$PATH"
 
 PROJECT_DIR="/opt/sms-api"
 SERVICE_NAME="sms-api"
 
 echo "=== SMS API Deploy ==="
+echo "HOME=$REAL_HOME, USER=$(whoami)"
+echo "PATH=$PATH"
 echo "Time: $(date)"
 
 cd "$PROJECT_DIR"
