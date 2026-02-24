@@ -1,7 +1,11 @@
 import hashlib
 import os
 import time
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Form
+from fastapi.staticfiles import StaticFiles
+
 from config import load_secret
 
 SMS_OUTGOING_DIR = "/var/spool/sms/outgoing"
@@ -47,3 +51,14 @@ def send_sms(
         "status": "OK",
         "file": filename
     }
+
+
+# Mount admin routes (must be before static files)
+from importlib import import_module
+admin_routes = import_module("admin-routes")
+app.include_router(admin_routes.router)
+
+# Serve Svelte frontend static files (mount last to avoid route conflicts)
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
