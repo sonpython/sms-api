@@ -1,20 +1,28 @@
-# SMS API Service
+# SMS Gateway for smstools
 
-A lightweight SMS gateway with **admin dashboard** built with **FastAPI + Svelte**, designed to send SMS via HTTP API with **MD5 signature verification** and manage SMS files through a real-time web interface.
-Deployed securely via **Cloudflare Tunnel** — no inbound ports required.
+A **web GUI and HTTP API gateway** for [smstools](http://smstools3.kekekasvi.com/) — the Linux SMS server that uses USB/serial modems.
+
+Browse SMS folders, send messages, and monitor delivery in real-time through a modern web interface. Built with **FastAPI + Svelte**, deployed securely via **Cloudflare Tunnel**.
 
 ## Features
 
-- **SMS API** — Send SMS via HTTP POST with MD5 signature verification
-- **Admin Dashboard** — JWT-authenticated web UI to browse/search SMS files
-- **Real-time Updates** — WebSocket-powered live file monitoring
-- **Send Test SMS** — Admin can send test messages directly from the dashboard
-- **File Browser** — View incoming, sent, failed, outgoing, checked folders
-- **Phone & Message Preview** — Extracted from SMS file content (From:/To: headers)
+### Web GUI (Admin Dashboard)
+- **SMS File Browser** — View all smstools folders: incoming, sent, failed, outgoing, checked
+- **Phone & Message Preview** — Parsed from smstools file headers (From:/To:)
+- **Real-time Monitoring** — WebSocket-powered live updates when files arrive/move
+- **Send Test SMS** — Compose and send SMS directly from the dashboard
+- **Search & Sort** — Filter by filename, sort by name/date
 - **Mobile Responsive** — Optimized layout for phone screens
-- **CI/CD** — Auto-deploy on push via GitHub Actions + self-hosted runner
-- **smstools Compatible** — File-based SMS queue (`/var/spool/sms/`)
+- **JWT Authentication** — Secure admin access
+
+### HTTP API
+- **Send SMS** — `POST /send-sms` with MD5 signature verification
+- **smstools Compatible** — Writes to `/var/spool/sms/outgoing/`, smsd handles delivery
+
+### Infrastructure
 - **Cloudflare Tunnel** — Zero-trust deployment, no public ports
+- **CI/CD** — Auto-deploy on push via GitHub Actions + self-hosted runner
+- **predeploy.sh** — One-command VM setup
 
 ## Tech Stack
 
@@ -79,16 +87,19 @@ curl -X POST https://sms.sonpython.com/send-sms \
 {"detail": "INVALID_HASH"}  // 403
 ```
 
-## Admin Dashboard
+## How It Works
 
-Access at `/` after login with `ADMIN_KEY`.
+```
+[smstools/smsd] ←→ /var/spool/sms/{incoming,outgoing,sent,failed,checked}
+                          ↕
+                    [SMS Gateway]  ←→  Web GUI (Svelte)
+                          ↕
+                    HTTP API (/send-sms)
+                          ↕
+                    Cloudflare Tunnel → Internet
+```
 
-- Browse SMS folders (incoming, sent, failed, outgoing, checked)
-- Search by filename, sort by name/date
-- View file content in modal
-- Send test SMS to any number
-- Real-time WebSocket updates (live indicator)
-- Pagination (50 per page)
+The gateway reads/writes smstools spool directories. smsd daemon handles actual modem communication.
 
 ## Production Deployment
 

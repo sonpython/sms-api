@@ -5,11 +5,13 @@
 ```
 Internet → Cloudflare Tunnel → uvicorn :8000 → FastAPI
                                                 ├── POST /send-sms (SMS API)
-                                                ├── /admin/* (Admin dashboard API + WebSocket)
-                                                └── /* (Svelte frontend static files)
+                                                ├── /admin/* (Dashboard API + WebSocket)
+                                                └── /* (Svelte GUI)
+                                                         ↕
+                                              /var/spool/sms/ (smstools)
 ```
 
-FastAPI serves everything (API + static frontend) on a single port. Cloudflare Tunnel forwards all traffic to it. No nginx/caddy needed.
+FastAPI serves everything (API + static frontend) on a single port. Reads/writes smstools spool directories directly. Cloudflare Tunnel forwards all traffic — no nginx/caddy needed.
 
 ## Prerequisites
 
