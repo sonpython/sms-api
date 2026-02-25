@@ -221,9 +221,7 @@
       <button class="col-phone" onclick={() => toggleSort('name')}>
         Phone {sortIcon('name')}
       </button>
-      <button class="col-name" onclick={() => toggleSort('name')}>
-        Filename {sortIcon('name')}
-      </button>
+      <span class="col-preview">Message</span>
       <button class="col-date" onclick={() => toggleSort('modified')}>
         Date {sortIcon('modified')}
       </button>
@@ -237,10 +235,13 @@
       {#each files as file}
         <button class="file-row" class:selected={selectedFile?.filename === file.filename} onclick={() => openFile(file)}>
           <span class="col-phone desktop-only">{getPhone(file)}</span>
-          <span class="col-name desktop-only">{file.filename}</span>
+          <span class="col-preview desktop-only">{file.preview || ''}</span>
           <span class="col-date desktop-only">{formatDate(file.modified)}</span>
           <span class="mobile-only mobile-cell">
-            <span class="mobile-phone">{getPhone(file)}</span>
+            <span class="mobile-top">
+              <span class="mobile-phone">{getPhone(file)}</span>
+              <span class="mobile-preview">{file.preview || ''}</span>
+            </span>
             <span class="mobile-meta">{file.filename} · {formatDate(file.modified)}</span>
           </span>
         </button>
@@ -439,7 +440,7 @@
   }
   .file-header button:hover { color: #e2e8f0; }
   .col-phone { width: 130px; flex-shrink: 0; }
-  .col-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .col-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; }
   .col-date { width: 220px; flex-shrink: 0; white-space: nowrap; }
   .mobile-only { display: none; }
 
@@ -453,9 +454,25 @@
       gap: 0.15rem;
       width: 100%;
     }
+    .mobile-top {
+      display: flex;
+      gap: 0.75rem;
+      align-items: baseline;
+      overflow: hidden;
+    }
     .mobile-phone {
       font-size: 0.9rem;
       font-weight: 500;
+      flex-shrink: 0;
+    }
+    .mobile-preview {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
     }
     .mobile-meta {
       font-size: 0.7rem;
