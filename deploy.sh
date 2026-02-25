@@ -9,8 +9,6 @@ PROJECT_DIR="/opt/sms-api"
 SERVICE_NAME="sms-api"
 
 echo "=== SMS API Deploy ==="
-echo "HOME=$REAL_HOME, USER=$(whoami)"
-echo "PATH=$PATH"
 echo "Time: $(date)"
 
 cd "$PROJECT_DIR"
