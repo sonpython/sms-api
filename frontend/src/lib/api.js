@@ -84,6 +84,27 @@ export async function sendTestSms(phone, message) {
   return res.json()
 }
 
+export async function restartSmsd(onChunk) {
+  const res = await fetch('/admin/api/restart-smsd', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+
+  if (res.status === 401) {
+    clearToken()
+    throw new Error('UNAUTHORIZED')
+  }
+  if (!res.ok) throw new Error('Failed to restart smsd')
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    onChunk(decoder.decode(value))
+  }
+}
+
 export function createWebSocket() {
   const token = getToken()
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'

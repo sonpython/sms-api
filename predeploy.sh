@@ -87,6 +87,8 @@ echo ">> Setting up sudoers for deploy..."
 cat > /etc/sudoers.d/sms-api-deploy <<EOF
 $APP_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart sms-api
 $APP_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart cloudflared
+$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart smsd
+$APP_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl status smsd
 EOF
 chmod 440 /etc/sudoers.d/sms-api-deploy
 

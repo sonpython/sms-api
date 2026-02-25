@@ -1,9 +1,11 @@
 import asyncio
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends, Form
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 
@@ -193,6 +195,49 @@ def send_test_sms(
     filepath.write_text(content, encoding="utf-8")
 
     return {"status": "OK", "file": filename}
+
+
+# --- Restart smsd service ---
+
+@router.post("/api/restart-smsd")
+def restart_smsd(_admin: str = Depends(verify_token)):
+    """Restart smsd (smstools) service and stream output."""
+    def stream():
+        yield ">> Checking smsd status...\n"
+        try:
+            status = subprocess.run(
+                ["sudo", "systemctl", "status", "smsd"],
+                capture_output=True, text=True, timeout=10
+            )
+            yield status.stdout + status.stderr + "\n"
+        except Exception as e:
+            yield f"Error checking status: {e}\n"
+
+        yield ">> Restarting smsd...\n"
+        try:
+            restart = subprocess.run(
+                ["sudo", "systemctl", "restart", "smsd"],
+                capture_output=True, text=True, timeout=30
+            )
+            if restart.returncode == 0:
+                yield ">> smsd restarted successfully\n"
+            else:
+                yield f">> Restart failed (code {restart.returncode})\n"
+                yield restart.stderr + "\n"
+        except Exception as e:
+            yield f"Error restarting: {e}\n"
+
+        yield "\n>> Verifying smsd status...\n"
+        try:
+            verify = subprocess.run(
+                ["sudo", "systemctl", "status", "smsd"],
+                capture_output=True, text=True, timeout=10
+            )
+            yield verify.stdout + verify.stderr
+        except Exception as e:
+            yield f"Error verifying: {e}\n"
+
+    return StreamingResponse(stream(), media_type="text/plain")
 
 
 # --- WebSocket for realtime updates ---

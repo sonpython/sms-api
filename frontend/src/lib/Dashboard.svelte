@@ -1,5 +1,5 @@
 <script>
-  import { fetchSmsFiles, fetchSmsFile, sendTestSms, createWebSocket, clearToken } from './api.js'
+  import { fetchSmsFiles, fetchSmsFile, sendTestSms, restartSmsd, createWebSocket, clearToken } from './api.js'
 
   let { onLogout } = $props()
 
@@ -147,6 +147,25 @@
     }
   }
 
+  // Restart smsd
+  let restarting = $state(false)
+  let restartLog = $state('')
+  let showRestartLog = $state(false)
+
+  async function handleRestart() {
+    restarting = true
+    restartLog = ''
+    showRestartLog = true
+    try {
+      await restartSmsd((chunk) => { restartLog += chunk })
+    } catch (err) {
+      if (err.message === 'UNAUTHORIZED') { onLogout(); return }
+      restartLog += `\nError: ${err.message}\n`
+    } finally {
+      restarting = false
+    }
+  }
+
   function getPhone(file) {
     return file.phone || '—'
   }
@@ -166,6 +185,7 @@
     <h1>SMS Admin</h1>
     <div class="header-right">
       <span class="ws-status" class:connected={wsConnected}>{wsConnected ? 'Live' : 'Offline'}</span>
+      <button class="btn-restart" onclick={handleRestart} disabled={restarting}>{restarting ? 'Restarting...' : 'Restart smsd'}</button>
       <button class="btn-send" onclick={() => { showSendForm = !showSendForm; sendResult = null }}>Send SMS</button>
       <button class="btn-logout" onclick={handleLogout}>Logout</button>
     </div>
@@ -188,6 +208,17 @@
           </span>
         {/if}
       </div>
+    </div>
+  {/if}
+
+  <!-- Restart log -->
+  {#if showRestartLog}
+    <div class="restart-log-panel">
+      <div class="restart-log-header">
+        <span>smsd service log</span>
+        <button class="btn-close-log" onclick={() => showRestartLog = false}>×</button>
+      </div>
+      <pre class="restart-log">{restartLog || 'Waiting...'}</pre>
     </div>
   {/if}
 
@@ -318,7 +349,52 @@
     cursor: pointer;
     font-size: 0.875rem;
   }
+  .btn-restart {
+    padding: 0.4rem 0.75rem;
+    background: #92400e;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .btn-restart:hover:not(:disabled) { background: #b45309; }
+  .btn-restart:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-send:hover { background: #2563eb; }
+
+  /* Restart log */
+  .restart-log-panel {
+    background: #0f172a;
+    border-bottom: 1px solid #334155;
+  }
+  .restart-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    border-bottom: 1px solid #1e293b;
+  }
+  .btn-close-log {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+  .btn-close-log:hover { color: #e2e8f0; }
+  .restart-log {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    color: #22c55e;
+    max-height: 300px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
   .btn-logout:hover { background: #475569; }
 
   /* Send form */
