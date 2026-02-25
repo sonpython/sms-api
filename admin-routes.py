@@ -206,7 +206,7 @@ def restart_smsd(_admin: str = Depends(verify_token)):
         yield ">> Checking smsd status...\n"
         try:
             status = subprocess.run(
-                ["sudo", "systemctl", "status", "smsd"],
+                ["sudo", "systemctl", "status", "smstools"],
                 capture_output=True, text=True, timeout=10
             )
             yield status.stdout + status.stderr + "\n"
@@ -216,7 +216,7 @@ def restart_smsd(_admin: str = Depends(verify_token)):
         yield ">> Restarting smsd...\n"
         try:
             restart = subprocess.run(
-                ["sudo", "systemctl", "restart", "smsd"],
+                ["sudo", "systemctl", "restart", "smstools"],
                 capture_output=True, text=True, timeout=30
             )
             if restart.returncode == 0:
@@ -230,7 +230,7 @@ def restart_smsd(_admin: str = Depends(verify_token)):
         yield "\n>> Verifying smsd status...\n"
         try:
             verify = subprocess.run(
-                ["sudo", "systemctl", "status", "smsd"],
+                ["sudo", "systemctl", "status", "smstools"],
                 capture_output=True, text=True, timeout=10
             )
             yield verify.stdout + verify.stderr
