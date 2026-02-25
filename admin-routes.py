@@ -72,6 +72,21 @@ def _validate_folder(folder: str):
         raise HTTPException(status_code=400, detail=f"Invalid folder. Allowed: {ALLOWED_FOLDERS}")
 
 
+def _extract_phone(f: Path) -> str:
+    """Extract phone from From:/To: header in sms file."""
+    try:
+        with open(f, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    break
+                if line.startswith(("From:", "To:")):
+                    return line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _file_entry(f: Path) -> dict:
     """Build file metadata dict with single stat call."""
     stat = f.stat()
@@ -80,6 +95,7 @@ def _file_entry(f: Path) -> dict:
         "size": stat.st_size,
         "modified": stat.st_mtime,
         "modified_iso": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        "phone": _extract_phone(f),
     }
 
 

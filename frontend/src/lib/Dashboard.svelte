@@ -147,10 +147,8 @@
     }
   }
 
-  function parsePhone(filename) {
-    // sms_1740000001_0901234567.sms → 0901234567
-    const match = filename.match(/_(\d{9,15})\./)
-    return match ? match[1] : '—'
+  function getPhone(file) {
+    return file.phone || '—'
   }
 
   function formatDate(ts) {
@@ -238,11 +236,11 @@
     {:else}
       {#each files as file}
         <button class="file-row" class:selected={selectedFile?.filename === file.filename} onclick={() => openFile(file)}>
-          <span class="col-phone desktop-only">{parsePhone(file.filename)}</span>
+          <span class="col-phone desktop-only">{getPhone(file)}</span>
           <span class="col-name desktop-only">{file.filename}</span>
           <span class="col-date desktop-only">{formatDate(file.modified)}</span>
           <span class="mobile-only mobile-cell">
-            <span class="mobile-phone">{parsePhone(file.filename)}</span>
+            <span class="mobile-phone">{getPhone(file)}</span>
             <span class="mobile-meta">{file.filename} · {formatDate(file.modified)}</span>
           </span>
         </button>
