@@ -4,6 +4,10 @@ A **web GUI and HTTP API gateway** for [smstools](http://smstools3.kekekasvi.com
 
 Browse SMS folders, send messages, and monitor delivery in real-time through a modern web interface. Built with **FastAPI + Svelte**, deployed securely via **Cloudflare Tunnel**.
 
+## Screenshots
+
+![Dashboard - Sent](docs/screenshots/dashboard-sent.png)
+
 ## Features
 
 ### Web GUI (Admin Dashboard)
