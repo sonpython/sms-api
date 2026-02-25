@@ -147,6 +147,12 @@
     }
   }
 
+  function parsePhone(filename) {
+    // sms_1740000001_0901234567.sms → 0901234567
+    const match = filename.match(/_(\d{9,15})\./)
+    return match ? match[1] : '—'
+  }
+
   function formatDate(ts) {
     return new Date(ts * 1000).toLocaleString()
   }
@@ -213,14 +219,16 @@
 
   <!-- File list -->
   <div class="file-list">
-    <div class="file-header">
+    <div class="file-header desktop-only">
+      <button class="col-phone" onclick={() => toggleSort('name')}>
+        Phone {sortIcon('name')}
+      </button>
       <button class="col-name" onclick={() => toggleSort('name')}>
         Filename {sortIcon('name')}
       </button>
       <button class="col-date" onclick={() => toggleSort('modified')}>
         Date {sortIcon('modified')}
       </button>
-      <span class="col-size">Size</span>
     </div>
 
     {#if loading}
@@ -230,9 +238,13 @@
     {:else}
       {#each files as file}
         <button class="file-row" class:selected={selectedFile?.filename === file.filename} onclick={() => openFile(file)}>
-          <span class="col-name">{file.filename}</span>
-          <span class="col-date">{formatDate(file.modified)}</span>
-          <span class="col-size">{file.size}B</span>
+          <span class="col-phone desktop-only">{parsePhone(file.filename)}</span>
+          <span class="col-name desktop-only">{file.filename}</span>
+          <span class="col-date desktop-only">{formatDate(file.modified)}</span>
+          <span class="mobile-only mobile-cell">
+            <span class="mobile-phone">{parsePhone(file.filename)}</span>
+            <span class="mobile-meta">{file.filename} · {formatDate(file.modified)}</span>
+          </span>
         </button>
       {/each}
     {/if}
@@ -428,10 +440,36 @@
     text-align: left;
   }
   .file-header button:hover { color: #e2e8f0; }
-  .file-header span { padding: 0.6rem 1rem; }
+  .col-phone { width: 130px; flex-shrink: 0; }
   .col-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .col-date { width: 180px; flex-shrink: 0; }
-  .col-size { width: 80px; flex-shrink: 0; text-align: right; }
+  .col-date { width: 220px; flex-shrink: 0; white-space: nowrap; }
+  .mobile-only { display: none; }
+
+  @media (max-width: 640px) {
+    .desktop-only { display: none !important; }
+    .mobile-only { display: flex !important; }
+    .file-row { padding: 0.5rem 1rem; }
+    .mobile-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      width: 100%;
+    }
+    .mobile-phone {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+    .mobile-meta {
+      font-size: 0.7rem;
+      color: #64748b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-list { margin: 0 0.75rem; }
+    .toolbar { padding: 0.75rem; }
+    .search-input { max-width: none; }
+  }
 
   .file-row {
     display: flex;
