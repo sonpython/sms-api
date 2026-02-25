@@ -14,23 +14,30 @@ FastAPI serves everything (API + static frontend) on a single port. Cloudflare T
 ## Prerequisites
 
 - Ubuntu/Debian VM with USB 5G modem
-- Python 3.9+, pip3
-- Bun (JS runtime) — `curl -fsSL https://bun.sh/install | bash`
-- cloudflared — [install guide](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+- Python 3.11+
 - systemd
+- cloudflared — [install guide](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+
+All other deps (uv, bun, venv, pip packages) are installed automatically by `predeploy.sh`.
 
 ## 1. Application Setup
 
 ```bash
+git clone <repo> /opt/sms-api
 cd /opt/sms-api
-pip3 install -r requirements.txt
-cd frontend && bun install && bun run build && cd ..
 
-# Create passkey.conf from example
-cp passkey.conf.example passkey.conf
-# Edit with strong random keys:
+# Auto-install everything: python venv, uv, bun, deps, systemd service
+sudo bash predeploy.sh michaelphan
+
+# Configure secrets
+nano passkey.conf
 # SECRET_KEY=<random-64-char-string>
 # ADMIN_KEY=<random-64-char-string>
+# SMS_BASE_DIR=/var/spool/sms
+
+# Add user to smsd group for SMS file access
+sudo usermod -aG smsd michaelphan
+sudo systemctl restart sms-api
 ```
 
 ## 2. Systemd Service — sms-api
@@ -148,9 +155,9 @@ echo "michaelphan ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart sms-api" \
 
 ### 4.3 Deploy Flow
 
-Push to `main` → GitHub Actions → self-hosted runner → `deploy.sh`:
-1. `git pull origin main`
-2. `pip3 install -r requirements.txt`
+Push to `main` → GitHub Actions → self-hosted runner:
+1. `git pull origin main` (workflow step)
+2. `uv pip install -r requirements.txt` (deploy.sh)
 3. `bun install && bun run build` (frontend)
 4. `sudo systemctl restart sms-api`
 
@@ -179,5 +186,6 @@ curl -X POST https://sms.sonpython.com/send-sms \
 |-------|-----|
 | 502 Bad Gateway | `systemctl status sms-api` — uvicorn not running |
 | WebSocket disconnects | Check cloudflared config has no `connectTimeout` too low |
-| Deploy fails `pip not found` | Use `pip3` (already fixed in deploy.sh) |
+| Deploy fails `uv/bun not found` | Run `predeploy.sh` or check PATH in deploy.sh |
 | Permission denied restart | Check sudoers entry in step 4.2 |
+| No SMS files visible | `sudo usermod -aG smsd michaelphan` + restart service |
