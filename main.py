@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 import time
 from pathlib import Path
 
@@ -21,7 +22,10 @@ def verify_md5(phone: str, message: str, client_hash: str) -> bool:
 
 
 def create_sms_file(phone: str, message: str):
-    ts = int(time.time())
+    # Millisecond timestamp: two requests in the same second must not
+    # collide on the same filename (the later write would silently
+    # overwrite and drop the earlier SMS).
+    ts = int(time.time() * 1000)
     filename = f"sms_{ts}_{phone}.sms"
     path = os.path.join(SMS_OUTGOING_DIR, filename)
 
@@ -30,8 +34,15 @@ def create_sms_file(phone: str, message: str):
 {message}
 """
 
-    with open(path, "w", encoding="utf-8") as f:
+    # smsd scans outgoing/ continuously and will pick up half-written
+    # files (empty To:/body -> modem CMS ERROR 500 -> smsd blocks 3600s).
+    # smsd ignores *.LOCK files, so write locked then rename (atomic).
+    lock_path = path + ".LOCK"
+    with open(lock_path, "w", encoding="utf-8") as f:
         f.write(content)
+        f.flush()
+        os.fsync(f.fileno())
+    os.rename(lock_path, path)
 
     return filename
 
@@ -45,7 +56,14 @@ def send_sms(
     if not verify_md5(sdt, noidungtinnhan, hash):
         raise HTTPException(status_code=403, detail="INVALID_HASH")
 
-    filename = create_sms_file(sdt, noidungtinnhan)
+    # Reject malformed input: an empty/garbage To: header makes the modem
+    # fail with CMS ERROR 500 and smsd block all traffic for 3600s.
+    if not re.fullmatch(r"\+?\d{8,15}", sdt.strip()):
+        raise HTTPException(status_code=400, detail="INVALID_PHONE")
+    if not noidungtinnhan.strip():
+        raise HTTPException(status_code=400, detail="EMPTY_MESSAGE")
+
+    filename = create_sms_file(sdt.strip(), noidungtinnhan)
 
     return {
         "status": "OK",

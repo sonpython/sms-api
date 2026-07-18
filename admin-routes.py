@@ -184,15 +184,28 @@ def send_test_sms(
     _admin: str = Depends(verify_token),
 ):
     """Send a test SMS by writing to the outgoing spool directory."""
+    import os
+    import re
     import time
-    ts = int(time.time())
+
+    if not re.fullmatch(r"\+?\d{8,15}", phone.strip()):
+        raise HTTPException(status_code=400, detail="INVALID_PHONE")
+    if not message.strip():
+        raise HTTPException(status_code=400, detail="EMPTY_MESSAGE")
+
+    phone = phone.strip()
+    ts = int(time.time() * 1000)
     filename = f"sms_{ts}_{phone}.sms"
     outgoing = Path(SMS_BASE_DIR) / "outgoing"
     outgoing.mkdir(parents=True, exist_ok=True)
     filepath = outgoing / filename
 
+    # Write as *.LOCK then rename: smsd ignores locked files, preventing it
+    # from picking up a half-written file (causes empty SMS + CMS ERROR 500).
     content = f"To: {phone}\n\n{message}\n"
-    filepath.write_text(content, encoding="utf-8")
+    lock_path = filepath.with_suffix(".sms.LOCK")
+    lock_path.write_text(content, encoding="utf-8")
+    os.rename(lock_path, filepath)
 
     return {"status": "OK", "file": filename}
 
