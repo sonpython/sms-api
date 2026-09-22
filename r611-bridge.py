@@ -51,7 +51,7 @@ def ucs2_encode(text: str) -> str:
 
 def ucs2_decode(value: str) -> str:
     s = (value or "").strip()
-    if not s or len(s) % 4 or not re.fullmatch(r"[0-9A-Fa-f]+", s):
+    if not s or len(s) % 2 or not re.fullmatch(r"[0-9A-Fa-f]+", s):
         return value or ""
     try:
         raw = bytes.fromhex(s)
