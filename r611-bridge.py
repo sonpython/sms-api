@@ -10,6 +10,7 @@ Router API (reverse engineered from js/panel/SMS/SMS.js): multipart form POST to
 /cgi-bin/cx_sms, text fields are UCS-2 hex (4 hex digits per UTF-16 unit).
 """
 
+import json
 import logging
 import re
 import sys
@@ -66,7 +67,9 @@ def router_post(page: str, **fields) -> dict:
     headers = {"Connection": "close", "Accept-Encoding": "identity"}
     r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, headers=headers, timeout=HTTP_TIMEOUT)
     r.raise_for_status()
-    return r.json()
+    # The router emits raw UTF-8 without a charset header; requests would guess
+    # latin-1 and turn Vietnamese text into mojibake.
+    return json.loads(r.content.decode("utf-8", errors="replace"))
 
 
 def parse_spool_file(path: Path) -> tuple[str, str]:
@@ -126,6 +129,23 @@ def process_outgoing():
                                                     f"Fail_reason: {res.get('message', 'router error')}"], body)
 
 
+def decode_sender(value: str) -> str:
+    """Alphanumeric senders arrive as concatenated decimal char codes
+    ("86736984846976" -> "VIETTEL"); numeric senders are returned unchanged."""
+    s = (value or "").strip()
+    if not s.isdigit() or len(s) < 4 or s.startswith(("0", "84")):
+        return s
+    out, i = "", 0
+    while i < len(s):
+        for width in (3, 2):
+            chunk = s[i:i + width]
+            if len(chunk) == width and 32 <= int(chunk) <= 126:
+                out += chr(int(chunk)); i += width; break
+        else:
+            return s  # not a char-code sequence after all
+    return out
+
+
 def parse_router_time(value: str) -> str:
     # Router format: "26/09/22,16:30:50+28" (yy/mm/dd,hh:mm:ss+tz quarter-hours).
     try:
@@ -143,7 +163,7 @@ def process_inbox():
         return
     INCOMING_DIR.mkdir(parents=True, exist_ok=True)
     for item in res.get("sms_list") or []:
-        phone, idx = item.get("phone", ""), item.get("index")
+        phone, idx = decode_sender(item.get("phone", "")), item.get("index")
         body = ucs2_decode(item.get("message", ""))
         received = datetime.now().strftime("%y-%m-%d %H:%M:%S")
         name = f"R611.{int(time.time() * 1000)}_{idx}_{phone}.sms"
