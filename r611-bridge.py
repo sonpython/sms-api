@@ -26,7 +26,10 @@ log = logging.getLogger("r611-bridge")
 CFG = _load_config()
 ROUTER_URL = CFG.get("R611_URL", "http://192.168.1.170").rstrip("/")
 SEND_POLL_SEC = float(CFG.get("R611_SEND_POLL_SEC", "2"))
-INBOX_POLL_SEC = float(CFG.get("R611_INBOX_POLL_SEC", "20"))
+INBOX_POLL_SEC = float(CFG.get("R611_INBOX_POLL_SEC", "60"))
+# After a router timeout, back off: the modem AT channel wedges for many minutes when
+# requests pile up, so hammering it only makes recovery slower.
+BACKOFF_SEC = float(CFG.get("R611_BACKOFF_SEC", "300"))
 MAX_SEND_ATTEMPTS = 3
 
 BASE = Path(load_sms_base_dir())
@@ -96,7 +99,8 @@ def process_outgoing():
             try:
                 res = router_post("SendSMSInfo", phone=phone, message=ucs2_encode(body))
             except requests.RequestException as e:
-                log.error("router unreachable while sending %s: %s", path.name, e)
+                log.error("router unreachable while sending %s: %s; backing off %ss", path.name, e, BACKOFF_SEC)
+                time.sleep(BACKOFF_SEC)
                 return  # keep file, retry next loop
             took = int(time.time() - t0)
             if res.get("result") == 0:
@@ -123,7 +127,8 @@ def process_inbox():
     try:
         res = router_post("GetRecvSMSInfo", pageNumber=1)
     except (requests.RequestException, ValueError) as e:
-        log.error("inbox poll failed: %s", e)
+        log.error("inbox poll failed: %s; backing off %ss", e, BACKOFF_SEC)
+        time.sleep(BACKOFF_SEC)
         return
     INCOMING_DIR.mkdir(parents=True, exist_ok=True)
     for item in res.get("sms_list") or []:
