@@ -1,0 +1,156 @@
+"""Bridge between the smstools-style spool dirs and a 4G router R611 Pro web API.
+
+Replaces smsd (USB modem) while keeping the spool layout that main.py, the admin
+UI and the websocket watcher already rely on:
+
+  outgoing/ (+ leftover checked/)  -> POST cx_sms SendSMSInfo -> sent/ | failed/
+  router inbox (GetRecvSMSInfo)    -> incoming/ files, then DeleteSMSInfo on router
+
+Router API (reverse engineered from js/panel/SMS/SMS.js): multipart form POST to
+/cgi-bin/cx_sms, text fields are UCS-2 hex (4 hex digits per UTF-16 unit).
+"""
+
+import logging
+import re
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import requests
+
+from config import _load_config, load_sms_base_dir
+
+log = logging.getLogger("r611-bridge")
+
+CFG = _load_config()
+ROUTER_URL = CFG.get("R611_URL", "http://192.168.1.170").rstrip("/")
+SEND_POLL_SEC = float(CFG.get("R611_SEND_POLL_SEC", "2"))
+INBOX_POLL_SEC = float(CFG.get("R611_INBOX_POLL_SEC", "20"))
+MAX_SEND_ATTEMPTS = 3
+
+BASE = Path(load_sms_base_dir())
+OUTGOING_DIRS = [BASE / "outgoing", BASE / "checked"]
+SENT_DIR, FAILED_DIR, INCOMING_DIR = BASE / "sent", BASE / "failed", BASE / "incoming"
+
+# Per-file counter of router-side rejections (result != 0). Network errors do
+# not count: the message simply waits for the router to come back.
+_attempts: dict[str, int] = {}
+
+
+def ucs2_encode(text: str) -> str:
+    return text.encode("utf-16-be", errors="replace").hex().upper()
+
+
+def ucs2_decode(value: str) -> str:
+    s = (value or "").strip()
+    if not s or len(s) % 4 or not re.fullmatch(r"[0-9A-Fa-f]+", s):
+        return value or ""
+    try:
+        return bytes.fromhex(s).decode("utf-16-be", errors="replace")
+    except ValueError:
+        return value
+
+
+def router_post(page: str, **fields) -> dict:
+    # files= forces multipart/form-data, which is what the web UI (FormData) sends.
+    form = {"Page": (None, page), **{k: (None, str(v)) for k, v in fields.items()}}
+    r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, timeout=45)
+    r.raise_for_status()
+    return r.json()
+
+
+def parse_spool_file(path: Path) -> tuple[str, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    head, _, body = text.partition("\n\n")
+    phone = ""
+    for line in head.splitlines():
+        if line.startswith("To:"):
+            phone = line.split(":", 1)[1].strip()
+    return phone, body.rstrip("\n")
+
+
+def write_result(dest_dir: Path, path: Path, headers: list[str], body: str):
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    (dest_dir / path.name).write_text("\n".join(headers) + "\n\n" + body + "\n", encoding="utf-8")
+    path.unlink(missing_ok=True)
+    _attempts.pop(path.name, None)
+
+
+def process_outgoing():
+    for d in OUTGOING_DIRS:
+        if not d.exists():
+            continue
+        for path in sorted(d.glob("*.sms")):
+            phone, body = parse_spool_file(path)
+            stamp = datetime.now().strftime("%y-%m-%d %H:%M:%S")
+            if not re.fullmatch(r"\+?\d{8,15}", phone) or not body.strip():
+                write_result(FAILED_DIR, path, [f"To: {phone}", "Modem: R611", f"Failed: {stamp}",
+                                                "Fail_reason: invalid phone or empty body"], body)
+                log.warning("invalid spool file %s -> failed", path.name)
+                continue
+            t0 = time.time()
+            try:
+                res = router_post("SendSMSInfo", phone=phone, message=ucs2_encode(body))
+            except requests.RequestException as e:
+                log.error("router unreachable while sending %s: %s", path.name, e)
+                return  # keep file, retry next loop
+            took = int(time.time() - t0)
+            if res.get("result") == 0:
+                write_result(SENT_DIR, path, [f"To: {phone}", "Modem: R611", f"Sent: {stamp}",
+                                              f"Sending_time: {took}"], body)
+                log.info("sent %s to %s in %ss", path.name, phone, took)
+            else:
+                n = _attempts[path.name] = _attempts.get(path.name, 0) + 1
+                log.warning("router rejected %s (%s) attempt %d/%d", path.name, res.get("message"), n, MAX_SEND_ATTEMPTS)
+                if n >= MAX_SEND_ATTEMPTS:
+                    write_result(FAILED_DIR, path, [f"To: {phone}", "Modem: R611", f"Failed: {stamp}",
+                                                    f"Fail_reason: {res.get('message', 'router error')}"], body)
+
+
+def parse_router_time(value: str) -> str:
+    # Router format: "26/09/22,16:30:50+28" (yy/mm/dd,hh:mm:ss+tz quarter-hours).
+    try:
+        return datetime.strptime(value[:17], "%y/%m/%d,%H:%M:%S").strftime("%y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return value or ""
+
+
+def process_inbox():
+    try:
+        res = router_post("GetRecvSMSInfo", pageNumber=1)
+    except (requests.RequestException, ValueError) as e:
+        log.error("inbox poll failed: %s", e)
+        return
+    INCOMING_DIR.mkdir(parents=True, exist_ok=True)
+    for item in res.get("sms_list") or []:
+        phone, idx = item.get("phone", ""), item.get("index")
+        body = ucs2_decode(item.get("message", ""))
+        received = datetime.now().strftime("%y-%m-%d %H:%M:%S")
+        name = f"R611.{int(time.time() * 1000)}_{idx}_{phone}.sms"
+        headers = [f"From: {phone}", f"Sent: {parse_router_time(item.get('time', ''))}",
+                   f"Received: {received}", f"Subject: {body[:40]}", "Modem: R611"]
+        (INCOMING_DIR / name).write_text("\n".join(headers) + "\n\n" + body + "\n", encoding="utf-8")
+        try:
+            # smsType 0 = device memory inbox (the UI's "Device Inbox" tab).
+            router_post("DeleteSMSInfo", smsType=0, index_list=idx)
+        except requests.RequestException as e:
+            log.error("saved %s but could not delete index %s on router: %s", name, idx, e)
+            return  # avoid duplicating the rest of the page; retry next poll
+        log.info("received from %s -> %s", phone, name)
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
+    log.info("start: router=%s spool=%s", ROUTER_URL, BASE)
+    next_inbox = 0.0
+    while True:
+        process_outgoing()
+        if time.time() >= next_inbox:
+            process_inbox()
+            next_inbox = time.time() + INBOX_POLL_SEC
+        time.sleep(SEND_POLL_SEC)
+
+
+if __name__ == "__main__":
+    main()

@@ -19,6 +19,8 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
 SMS_BASE_DIR = load_sms_base_dir()
+# Service that drains the spool: r611-bridge (4G router API) replaced smstools.
+SMS_SERVICE = "r611-bridge"
 ALLOWED_FOLDERS = ["checked", "failed", "incoming", "outgoing", "sent"]
 
 router = APIRouter(prefix="/admin")
@@ -214,12 +216,12 @@ def send_test_sms(
 
 @router.post("/api/restart-smsd")
 def restart_smsd(_admin: str = Depends(verify_token)):
-    """Restart smsd (smstools) service and stream output."""
+    """Restart the SMS bridge service and stream output."""
     def stream():
         yield ">> Checking smsd status...\n"
         try:
             status = subprocess.run(
-                ["sudo", "systemctl", "status", "smstools"],
+                ["sudo", "systemctl", "status", SMS_SERVICE],
                 capture_output=True, text=True, timeout=10
             )
             yield status.stdout + status.stderr + "\n"
@@ -229,7 +231,7 @@ def restart_smsd(_admin: str = Depends(verify_token)):
         yield ">> Restarting smsd...\n"
         try:
             restart = subprocess.run(
-                ["sudo", "systemctl", "restart", "smstools"],
+                ["sudo", "systemctl", "restart", SMS_SERVICE],
                 capture_output=True, text=True, timeout=30
             )
             if restart.returncode == 0:
@@ -243,7 +245,7 @@ def restart_smsd(_admin: str = Depends(verify_token)):
         yield "\n>> Verifying smsd status...\n"
         try:
             verify = subprocess.run(
-                ["sudo", "systemctl", "status", "smstools"],
+                ["sudo", "systemctl", "status", SMS_SERVICE],
                 capture_output=True, text=True, timeout=10
             )
             yield verify.stdout + verify.stderr

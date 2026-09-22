@@ -1,3 +1,8 @@
 SECRET_KEY=abc
 ADMIN_KEY=abc
 SMS_BASE_DIR=/var/spool/sms
+
+# r611-bridge: 4G router R611 Pro web API (replaces smstools/USB modem)
+# R611_URL=http://192.168.1.170
+# R611_SEND_POLL_SEC=2
+# R611_INBOX_POLL_SEC=20
