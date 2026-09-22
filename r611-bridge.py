@@ -54,9 +54,14 @@ def ucs2_decode(value: str) -> str:
     if not s or len(s) % 4 or not re.fullmatch(r"[0-9A-Fa-f]+", s):
         return value or ""
     try:
-        return bytes.fromhex(s).decode("utf-16-be", errors="replace")
+        raw = bytes.fromhex(s)
     except ValueError:
         return value
+    # 7-bit/ASCII messages arrive as 2 hex digits per byte, UCS-2 ones as 4 per
+    # character; treating an ASCII payload as UCS-2 yields CJK garbage.
+    if all(32 <= b <= 126 or b in (9, 10, 13) for b in raw):
+        return raw.decode("ascii")
+    return raw.decode("utf-16-be", errors="replace")
 
 
 def router_post(page: str, **fields) -> dict:
