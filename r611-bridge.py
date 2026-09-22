@@ -30,6 +30,9 @@ INBOX_POLL_SEC = float(CFG.get("R611_INBOX_POLL_SEC", "60"))
 # After a router timeout, back off: the modem AT channel wedges for many minutes when
 # requests pile up, so hammering it only makes recovery slower.
 BACKOFF_SEC = float(CFG.get("R611_BACKOFF_SEC", "300"))
+# One SendSMSInfo can take ~2 min on this router (each internal AT step may wait
+# for a timeout), so the HTTP timeout must be longer than the whole send.
+HTTP_TIMEOUT = float(CFG.get("R611_HTTP_TIMEOUT", "180"))
 MAX_SEND_ATTEMPTS = 3
 
 BASE = Path(load_sms_base_dir())
@@ -61,7 +64,7 @@ def router_post(page: str, **fields) -> dict:
     # The router's HTTP server never answers a keep-alive request that advertises
     # gzip (python-requests defaults); curl-like plain headers work.
     headers = {"Connection": "close", "Accept-Encoding": "identity"}
-    r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, headers=headers, timeout=45)
+    r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, headers=headers, timeout=HTTP_TIMEOUT)
     r.raise_for_status()
     return r.json()
 
@@ -98,6 +101,14 @@ def process_outgoing():
             t0 = time.time()
             try:
                 res = router_post("SendSMSInfo", phone=phone, message=ucs2_encode(body))
+            except requests.Timeout:
+                # The router keeps processing after we give up, so retrying would
+                # deliver the same OTP twice. Park it in failed/ for a human.
+                write_result(FAILED_DIR, path, [f"To: {phone}", "Modem: R611", f"Failed: {stamp}",
+                                                "Fail_reason: router timeout (message may still have been sent)"], body)
+                log.error("timeout sending %s; moved to failed, backing off %ss", path.name, BACKOFF_SEC)
+                time.sleep(BACKOFF_SEC)
+                return
             except requests.RequestException as e:
                 log.error("router unreachable while sending %s: %s; backing off %ss", path.name, e, BACKOFF_SEC)
                 time.sleep(BACKOFF_SEC)
