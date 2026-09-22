@@ -55,7 +55,10 @@ def ucs2_decode(value: str) -> str:
 def router_post(page: str, **fields) -> dict:
     # files= forces multipart/form-data, which is what the web UI (FormData) sends.
     form = {"Page": (None, page), **{k: (None, str(v)) for k, v in fields.items()}}
-    r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, timeout=45)
+    # The router's HTTP server never answers a keep-alive request that advertises
+    # gzip (python-requests defaults); curl-like plain headers work.
+    headers = {"Connection": "close", "Accept-Encoding": "identity"}
+    r = requests.post(f"{ROUTER_URL}/cgi-bin/cx_sms", files=form, headers=headers, timeout=45)
     r.raise_for_status()
     return r.json()
 

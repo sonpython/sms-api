@@ -28,6 +28,7 @@ cd ..
 # Restart API service (cloudflared stays running)
 echo ">> restart $SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
+sudo systemctl restart r611-bridge 2>/dev/null || true
 sudo systemctl restart cloudflared 2>/dev/null || true
 
 echo "=== Deploy complete ==="
